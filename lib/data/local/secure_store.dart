@@ -17,6 +17,7 @@ class SecureStore {
   static const _keyMasterHash = 'master_hash_base64';
   static const _keyUserName = 'user_name';
   static const _keyBiometricEnabled = 'biometric_enabled';
+  static const _keyCachedPin = 'cached_pin';
 
   Future<void> saveUserData(
     {
@@ -30,16 +31,25 @@ class SecureStore {
     await _storage.write(key: _keyUserName, value: userName);
   }
 
+  Future<void> cachePin(String pin) async {
+    await _storage.write(key: _keyCachedPin, value: pin);
+  }
+
+  Future<void> deleteCachedPin() async {
+    await _storage.delete(key: _keyCachedPin);
+  }
+
   Future<String?> getSalt() async => await _storage.read(key: _keyUserSalt);
   Future<String?> getMasterHash() async => await _storage.read(key: _keyMasterHash);
   Future<String?> getUserName() async => await _storage.read(key: _keyUserName);
+  Future<String?> getCachedPin() async => await _storage.read(key: _keyCachedPin);
 
   Future<void> updateUserInfo(String userName, String newMasterHash) async {
     await _storage.write(key: _keyUserName, value: userName);
     await _storage.write(key: _keyMasterHash, value: newMasterHash);
   }
 
-  Future<void> setBiometicEnabled(bool enabled) async {
+  Future<void> setBiometricEnabled(bool enabled) async {
     await _storage.write(key: _keyBiometricEnabled, value: enabled.toString());
   }
 
