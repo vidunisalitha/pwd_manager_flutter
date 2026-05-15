@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cryptography/cryptography.dart';
-import 'package:pwd_manager_flutter/core/crypto/hasher.dart';
-import 'package:pwd_manager_flutter/core/utils/biometric_service.dart';
-import 'package:pwd_manager_flutter/data/database/db_helper.dart';
-import 'package:pwd_manager_flutter/data/local/secure_store.dart';
+import 'package:pwd_manager_flutter/data/repositories/auth_repository.dart';
 
 enum AuthStatus {
   unknown,
@@ -17,20 +14,19 @@ class AuthProvider extends ChangeNotifier {
   SecretKey? _masterKey;
   String? _userName;
 
+  final AuthRepository _authRepository = AuthRepository();
+
   AuthStatus get status => _status;
   SecretKey? get masterKey => _masterKey;
   String? get userName => _userName;
 
-  final BiometricService _biometricService = BiometricService();
-
   Future<void> checkAuthStatus() async {
-    final storedUser = await SecureStore.instance.getUserName();
+    final isFirstTimer = await _authRepository.isFirstTimer();
 
-    if(storedUser == null) {
+    if (isFirstTimer) {
       _status = AuthStatus.firstTimer;
-    }
-    else {
-      _userName = storedUser;
+    } else {
+      _userName = await _authRepository.getStoredUsername();
       _status = AuthStatus.unauthenticated;
     }
 
@@ -39,41 +35,25 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> signUp(String username, String pin) async {
     try {
-      final result = await Hasher.hashPinForStorage(pin);
+      final success = await _authRepository.signUp(username, pin);
 
-      await SecureStore.instance.saveUserData(
-        userName: username,
-        masterHash: result['hash'].toString(),
-        salt: result['salt'].toString(),
-      );
+      if (success) {
+        _userName = username;
+        _status = AuthStatus.authenticated;
+        notifyListeners();
+      }
 
-      _userName = username;
-      _status = AuthStatus.authenticated;
-      notifyListeners();
-      return true;
-
+      return success;
     } catch (e) {
       return false;
     }
   }
 
   Future<bool> login(String pin) async {
-    final storedHash = await SecureStore.instance.getMasterHash();
-    final storedSalt = await SecureStore.instance.getSalt();
+    final masterKey = await _authRepository.login(pin);
 
-    if(storedHash == null || storedSalt == null) return false;
-
-    final isValid = await Hasher.verifyPin(
-      enteredPin: pin,
-      storedHashBase64: storedHash,
-      storedSaltBase64: storedSalt,
-    );
-
-    if(isValid) {
-      _masterKey = await Hasher.deriveKey(pin, storedSalt.split(',').map(int.parse).toList());
-
-      await DBHelper.instance.getDatabase(storedHash);
-
+    if (masterKey != null) {
+      _masterKey = masterKey;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -82,23 +62,20 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> loginWithBiometrics() async {
-    bool isEnabled = await SecureStore.instance.isBiometricEnabled();
-    if(!isEnabled) return false;
+    final masterKey = await _authRepository.loginWithBiometrics();
 
-    bool authenticated = await _biometricService.authenticate();
-    if(authenticated){
-      String? cachedPin = await SecureStore.instance.getCachedPin();
-
-      if(cachedPin != null){
-        return await login(cachedPin);
-      }
+    if (masterKey != null) {
+      _masterKey = masterKey;
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
     }
     return false;
   }
 
   Future<void> logout() async {
     _masterKey = null;
-    await DBHelper.instance.closeDatabase();
+    await _authRepository.logout();
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
