@@ -202,65 +202,18 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
     required String title,
     required String message,
   }) async {
-    final controller = TextEditingController();
-    bool _obscure = true;
-
     final result = await showDialog<String>(
       context: context,
+      useRootNavigator: true,
       builder: (dialogContext) {
-        final textTheme = Theme.of(dialogContext).textTheme;
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: Text(title),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(message, style: textTheme.bodyMedium),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: controller,
-                    obscureText: _obscure,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(4),
-                    ],
-                    decoration: InputDecoration(
-                      labelText: 'PIN',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () =>
-                      Navigator.pop(dialogContext, controller.text.trim()),
-                  child: const Text('Confirm'),
-                ),
-              ],
-            );
-          },
+        return _PinPromptDialog(
+          title: title,
+          message: message,
+          onCancel: () => Navigator.pop(dialogContext),
+          onConfirm: (pin) => Navigator.pop(dialogContext, pin),
         );
       },
     );
-
-    controller.dispose();
     return result;
   }
 
@@ -299,6 +252,9 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
   }
 
   Future<void> _logout() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textTheme = Theme.of(context).textTheme;
+
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -318,9 +274,21 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
             OutlinedButton(
               onPressed: () => Navigator.pop(dialogContext, true),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFE11D48),
-                side: const BorderSide(color: Color(0xFFFCA5A5)),
-                backgroundColor: const Color(0xFFFFF1F3),
+                foregroundColor: isDark ? Colors.white : const Color(0xFFE11D48),
+                side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF5A1B2A)
+                      : const Color(0xFFFCA5A5),
+                ),
+                backgroundColor: isDark
+                    ? const Color(0xFF6A1F32)
+                    : const Color(0xFFFDE8EE),
+                textStyle: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               child: const Text('Logout'),
             ),
@@ -686,6 +654,85 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PinPromptDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final VoidCallback onCancel;
+  final ValueChanged<String> onConfirm;
+
+  const _PinPromptDialog({
+    required this.title,
+    required this.message,
+    required this.onCancel,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_PinPromptDialog> createState() => _PinPromptDialogState();
+}
+
+class _PinPromptDialogState extends State<_PinPromptDialog> {
+  final TextEditingController _controller = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(widget.message, style: textTheme.bodyMedium),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _controller,
+            obscureText: _obscure,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(4),
+            ],
+            decoration: InputDecoration(
+              labelText: 'PIN',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                ),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: widget.onCancel,
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => widget.onConfirm(_controller.text.trim()),
+          child: const Text('Confirm'),
+        ),
+      ],
     );
   }
 }

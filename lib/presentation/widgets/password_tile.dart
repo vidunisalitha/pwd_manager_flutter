@@ -60,7 +60,7 @@ class _PasswordTileState extends State<PasswordTile> {
     final iconColor = isDark ? const Color(0xFF97A0AE) : const Color(0xFF9CA3AF);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: surfaceColor,
         borderRadius: BorderRadius.circular(18),
