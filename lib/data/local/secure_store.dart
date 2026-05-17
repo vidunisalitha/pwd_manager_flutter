@@ -17,6 +17,7 @@ class SecureStore {
   static const _keyMasterHash = 'master_hash_base64';
   static const _keyUserName = 'user_name';
   static const _keyBiometricEnabled = 'biometric_enabled';
+  static const _keyThemeMode = 'theme_mode';
   static const _keyCachedPin = 'cached_pin';
 
   Future<void> saveUserData(
@@ -49,6 +50,16 @@ class SecureStore {
     await _storage.write(key: _keyMasterHash, value: newMasterHash);
   }
 
+  Future<void> updateUserCredentials({
+    required String userName,
+    required String masterHash,
+    required String salt,
+  }) async {
+    await _storage.write(key: _keyUserName, value: userName);
+    await _storage.write(key: _keyMasterHash, value: masterHash);
+    await _storage.write(key: _keyUserSalt, value: salt);
+  }
+
   Future<void> setBiometricEnabled(bool enabled) async {
     await _storage.write(key: _keyBiometricEnabled, value: enabled.toString());
   }
@@ -57,6 +68,12 @@ class SecureStore {
     String? value = await _storage.read(key: _keyBiometricEnabled);
     return value == 'true';
   }
+
+  Future<void> setThemeMode(String mode) async {
+    await _storage.write(key: _keyThemeMode, value: mode);
+  }
+
+  Future<String?> getThemeMode() async => await _storage.read(key: _keyThemeMode);
 
   Future<void> clearAll() async {
     await _storage.deleteAll();

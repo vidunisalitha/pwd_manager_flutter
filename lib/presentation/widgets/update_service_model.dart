@@ -1,20 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pwd_manager_flutter/data/models/account_model.dart';
 import 'package:pwd_manager_flutter/presentation/providers/auth_provider.dart';
 import 'package:pwd_manager_flutter/presentation/providers/vault_provider.dart';
 
-class AddServiceModel extends StatefulWidget {
-  const AddServiceModel({super.key});
+class UpdateServiceModel extends StatefulWidget {
+  final AccountModel account;
+
+  const UpdateServiceModel({super.key, required this.account});
 
   @override
-  State<AddServiceModel> createState() => _AddServiceModelState();
+  State<UpdateServiceModel> createState() => _UpdateServiceModelState();
 }
 
-class _AddServiceModelState extends State<AddServiceModel> {
-  final _serviceController = TextEditingController();
-  final _userController = TextEditingController();
-  final _passwordController = TextEditingController();
+class _UpdateServiceModelState extends State<UpdateServiceModel> {
+  late final TextEditingController _serviceController;
+  late final TextEditingController _userController;
+  late final TextEditingController _passwordController;
   bool _obscurePassword = true;
+  bool _isSaving = false;
+  bool _isDeleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _serviceController = TextEditingController(
+      text: widget.account.serviceName,
+    );
+    _userController = TextEditingController(text: widget.account.username);
+    _passwordController = TextEditingController(
+      text: widget.account.decryptedPassword ?? '',
+    );
+  }
 
   @override
   void dispose() {
@@ -24,22 +41,102 @@ class _AddServiceModelState extends State<AddServiceModel> {
     super.dispose();
   }
 
-  void _save() async {
+  Future<void> _save() async {
+    final id = widget.account.id;
+    final auth = context.read<AuthProvider>();
+    final masterKey = auth.masterKey;
+
+    if (id == null || masterKey == null) {
+      return;
+    }
+
     if (_serviceController.text.isEmpty || _passwordController.text.isEmpty) {
       return;
     }
 
-    final auth = context.read<AuthProvider>();
+    setState(() => _isSaving = true);
     final vault = context.read<VaultProvider>();
-
-    await vault.addAccount(
+    final success = await vault.updateAccount(
+      id: id,
       serviceName: _serviceController.text,
       username: _userController.text,
       password: _passwordController.text,
-      masterKey: auth.masterKey!,
+      masterKey: masterKey,
     );
 
-    if (mounted) Navigator.pop(context);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isSaving = false);
+
+    if (success) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final id = widget.account.id;
+    final auth = context.read<AuthProvider>();
+    final masterKey = auth.masterKey;
+
+    if (id == null || masterKey == null) {
+      return;
+    }
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: const Text('Delete Service?'),
+          content: const Text(
+            'This will permanently delete this service from your vault.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: BorderSide(
+                  color: Theme.of(dialogContext).brightness == Brightness.dark
+                      ? const Color(0xFF5A1B2A)
+                      : const Color(0xFFFCA5A5),
+                ),
+                backgroundColor: Theme.of(dialogContext).brightness == Brightness.dark
+                    ? const Color(0xFF6A1F32)
+                    : const Color(0xFFFDE8EE),
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    setState(() => _isDeleting = true);
+    final vault = context.read<VaultProvider>();
+    final success = await vault.deleteAccount(id, masterKey);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isDeleting = false);
+
+    if (success) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -117,7 +214,7 @@ class _AddServiceModelState extends State<AddServiceModel> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Add New Service',
+                        'Update Service',
                         style: textTheme.headlineSmall?.copyWith(
                           color: titleColor,
                           fontWeight: FontWeight.w800,
@@ -203,7 +300,7 @@ class _AddServiceModelState extends State<AddServiceModel> {
                 SizedBox(
                   height: 54,
                   child: ElevatedButton(
-                    onPressed: _save,
+                    onPressed: _isSaving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF059669),
                       foregroundColor: Colors.white,
@@ -215,7 +312,31 @@ class _AddServiceModelState extends State<AddServiceModel> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    child: const Text('Save Password'),
+                    child: Text(_isSaving ? 'Updating...' : 'Update Service'),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  height: 54,
+                  child: OutlinedButton.icon(
+                    onPressed: _isDeleting ? null : _deleteAccount,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark ? Colors.white : const Color(0xFFE11D48),
+                      side: BorderSide(
+                        color: isDark ? const Color(0xFF5A1B2A) : const Color(0xFFFCA5A5),
+                      ),
+                      backgroundColor: isDark
+                          ? const Color(0xFF6A1F32)
+                          : const Color(0xFFFDE8EE),
+                      textStyle: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text(_isDeleting ? 'Deleting...' : 'Delete Service'),
                   ),
                 ),
                 ],

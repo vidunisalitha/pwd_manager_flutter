@@ -2,12 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:pwd_manager_flutter/data/repositories/auth_repository.dart';
 
-enum AuthStatus {
-  unknown,
-  firstTimer,
-  authenticated,
-  unauthenticated,
-}
+enum AuthStatus { unknown, firstTimer, authenticated, unauthenticated }
 
 class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.unknown;
@@ -78,5 +73,45 @@ class AuthProvider extends ChangeNotifier {
     await _authRepository.logout();
     _status = AuthStatus.unauthenticated;
     notifyListeners();
+  }
+
+  Future<bool> updateCredentials({
+    required String username,
+    required String currentPin,
+    required String newPin,
+    required String masterHash,
+    required String salt,
+    required SecretKey newMasterKey,
+  }) async {
+    final success = await _authRepository.updateCredentials(
+      username: username,
+      currentPin: currentPin,
+      newPin: newPin,
+      masterHash: masterHash,
+      salt: salt,
+    );
+
+    if (success) {
+      _userName = username;
+      _masterKey = newMasterKey;
+      notifyListeners();
+    }
+
+    return success;
+  }
+
+  Future<bool> setBiometricEnabled({
+    required String pin,
+    required bool enabled,
+  }) async {
+    return _authRepository.setBiometricEnabled(pin: pin, enabled: enabled);
+  }
+
+  Future<bool> verifyCurrentPin(String pin) async {
+    return _authRepository.verifyCurrentPin(pin);
+  }
+
+  Future<bool> isBiometricEnabled() async {
+    return _authRepository.isBiometricEnabled();
   }
 }

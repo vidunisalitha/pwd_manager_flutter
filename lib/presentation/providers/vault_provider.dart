@@ -98,12 +98,34 @@ class VaultProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> rotateVaultEncryptionKey({
+    required SecretKey oldMasterKey,
+    required SecretKey newMasterKey,
+  }) async {
+    try {
+      await _vaultRepository.rotateVaultEncryptionKey(
+        oldMasterKey: oldMasterKey,
+        newMasterKey: newMasterKey,
+      );
+
+      await loadAccounts(newMasterKey);
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> searchAccounts(String query, SecretKey masterKey) async {
     try {
       if (query.isEmpty) {
         _filteredAccounts = _accounts;
       } else {
-        _filteredAccounts = await _vaultRepository.searchAccounts(query, masterKey);
+        _filteredAccounts = await _vaultRepository.searchAccounts(
+          query,
+          masterKey,
+        );
       }
       _error = null;
     } catch (e) {
